@@ -3,15 +3,14 @@ package com.newsapi.api_demo.news.services;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.http.HttpEntity;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.HttpMethod;
-import org.springframework.http.ResponseEntity;
+import org.springframework.http.*;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 
 @Service
@@ -54,7 +53,6 @@ public class NewService {
 
     public void likeNews(String newsId) {
         try {
-            // Etapa 1: Buscar a notícia existente
             String getUrl = supabaseUrl + "/noticias?id=eq." + newsId;
 
             HttpHeaders headers = new HttpHeaders();
@@ -78,14 +76,12 @@ public class NewService {
                 throw new IllegalArgumentException("Notícia não encontrada");
             }
 
-            // Extrair os campos existentes da notícia
             JsonNode news = responseBody.get(0);
             String title = news.get("title").asText();
             String url = news.get("url").asText();
             int currentLikes = news.has("likes") ? news.get("likes").asInt() : 0;
             int updatedLikes = currentLikes + 1;
 
-            // Etapa 2: Atualizar os dados com PUT
             String putUrl = supabaseUrl + "/noticias?id=eq." + newsId;
 
             Map<String, Object> body = Map.of(
@@ -113,6 +109,57 @@ public class NewService {
 
         } catch (Exception e) {
             throw new RuntimeException("Erro ao curtir notícia: " + e.getMessage(), e);
+        }
+    }
+
+    public void editNews(String userId, String newsId, Map<String, Object> updateData) {
+        try {
+            // 1. Verificar se o usuário é admin
+            String userUrl = supabaseUrl + "/usuarios?id=eq." + userId;
+            HttpHeaders headers = new HttpHeaders();
+            headers.set("Authorization", "Bearer " + supabaseApiKey);
+            headers.set("apikey", supabaseApiKey);
+
+            ResponseEntity<String> userResponse = restTemplate.exchange(
+                    userUrl, HttpMethod.GET, new HttpEntity<>(headers), String.class);
+
+            JsonNode userBody = objectMapper.readTree(userResponse.getBody());
+            JsonNode userNode = userBody.get(0); // Pega o primeiro usuário
+            if (!userNode.get("isadmin").asBoolean()) {
+                throw new IllegalArgumentException("Usuário não possui permissão para editar notícias");
+            }
+
+            // 2. Buscar a notícia para verificar se existe
+            String newsUrl = supabaseUrl + "/noticias?id=eq." + newsId;
+            ResponseEntity<String> newsResponse = restTemplate.exchange(
+                    newsUrl, HttpMethod.GET, new HttpEntity<>(headers), String.class);
+
+            JsonNode newsBody = objectMapper.readTree(newsResponse.getBody());
+            if (newsBody.isEmpty()) {
+                throw new IllegalArgumentException("Notícia não encontrada");
+            }
+
+            // 3. Atualizar a notícia
+            Map<String, Object> validFields = updateData.entrySet().stream()
+                    .filter(entry -> List.of("title", "abstract", "url", "published_date").contains(entry.getKey()))
+                    .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+
+            validFields.put("id", newsId); // Inclua o ID no corpo da requisição
+
+            headers.setContentType(MediaType.APPLICATION_JSON); // Define Content-Type como JSON
+            System.out.println("Campos válidos enviados ao Supabase: " + objectMapper.writeValueAsString(validFields));
+
+            HttpEntity<String> updateEntity = new HttpEntity<>(
+                    objectMapper.writeValueAsString(validFields), headers);
+            ResponseEntity<Void> updateResponse = restTemplate.exchange(
+                    newsUrl, HttpMethod.PUT, updateEntity, Void.class);
+
+            if (!updateResponse.getStatusCode().is2xxSuccessful()) {
+                throw new IllegalArgumentException("Erro ao atualizar a notícia");
+            }
+
+        } catch (Exception e) {
+            throw new RuntimeException("Erro ao editar notícia: " + e.getMessage(), e);
         }
     }
 }

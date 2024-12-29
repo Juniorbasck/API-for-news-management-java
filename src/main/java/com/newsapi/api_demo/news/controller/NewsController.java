@@ -42,4 +42,30 @@ public class NewsController {
             );
         }
     }
+
+    @PutMapping("/edit")
+    public ResponseEntity<?> editNews(
+            @RequestParam("id") String newsId,
+            @RequestParam("userId") String userId,
+            @RequestBody Map<String, Object> updateData) {
+        try {
+            service.editNews(userId, newsId, updateData);
+            return ResponseEntity.ok(Map.of(
+                    "status", 200,
+                    "message", "Notícia atualizada com sucesso!"
+            ));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.status(403).body(Map.of(
+                    "status", 403,
+                    "message", e.getMessage()
+            ));
+        } catch (Exception e) {
+            return ResponseEntity.status(500).body(Map.of(
+                    "status", 500,
+                    "message", "Erro ao atualizar a notícia",
+                    "error", e.getMessage()
+            ));
+        }
+    }
+
 }
