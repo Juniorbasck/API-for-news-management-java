@@ -162,4 +162,58 @@ public class NewService {
             throw new RuntimeException("Erro ao editar notícia: " + e.getMessage(), e);
         }
     }
+
+    public void deleteNews(String userId, String newsId) {
+        try {
+            String userUrl = supabaseUrl + "/usuarios?id=eq." + userId;
+            HttpHeaders headers = new HttpHeaders();
+            headers.set("Authorization", "Bearer " + supabaseApiKey);
+            headers.set("apikey", supabaseApiKey);
+
+            HttpEntity<String> userEntity = new HttpEntity<>(headers);
+            ResponseEntity<String> userResponse = restTemplate.exchange(
+                    userUrl,
+                    HttpMethod.GET,
+                    userEntity,
+                    String.class
+            );
+
+            JsonNode userBody = objectMapper.readTree(userResponse.getBody());
+            JsonNode userNode = userBody.get(0);
+            if (userNode == null || !userNode.get("isadmin").asBoolean()) {
+                throw new IllegalArgumentException("Usuário não possui permissão para deletar notícias");
+            }
+
+            // Verificar se a notícia existe
+            String newsUrl = supabaseUrl + "/noticias?id=eq." + newsId;
+            HttpEntity<String> newsEntity = new HttpEntity<>(headers);
+            ResponseEntity<String> newsResponse = restTemplate.exchange(
+                    newsUrl,
+                    HttpMethod.GET,
+                    newsEntity,
+                    String.class
+            );
+
+            JsonNode newsBody = objectMapper.readTree(newsResponse.getBody());
+            if (newsBody.isEmpty()) {
+                throw new IllegalArgumentException("Notícia não encontrada");
+            }
+
+            // Deletar a notícia
+            HttpEntity<String> deleteEntity = new HttpEntity<>(headers);
+            ResponseEntity<Void> deleteResponse = restTemplate.exchange(
+                    newsUrl,
+                    HttpMethod.DELETE,
+                    deleteEntity,
+                    Void.class
+            );
+
+            if (!deleteResponse.getStatusCode().is2xxSuccessful()) {
+                throw new IllegalArgumentException("Erro ao deletar a notícia");
+            }
+
+        } catch (Exception e) {
+            throw new RuntimeException("Erro ao deletar notícia: " + e.getMessage(), e);
+        }
+    }
 }

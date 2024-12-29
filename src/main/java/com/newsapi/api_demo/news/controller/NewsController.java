@@ -68,4 +68,27 @@ public class NewsController {
         }
     }
 
+    @DeleteMapping("/delete")
+    public ResponseEntity<?> deleteNews(
+            @RequestParam("userId") String userId,
+            @RequestParam("newsId") String newsId) {
+        try {
+            service.deleteNews(userId, newsId);
+            return ResponseEntity.ok(Map.of(
+                    "status", 200,
+                    "message", "Notícia deletada com sucesso!"
+            ));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.status(400).body(Map.of(
+                    "status", 400,
+                    "message", e.getMessage()
+            ));
+        } catch (Exception e) {
+            return ResponseEntity.status(500).body(Map.of(
+                    "status", 500,
+                    "message", "Erro ao deletar a notícia",
+                    "error", e.getMessage()
+            ));
+        }
+    }
 }
